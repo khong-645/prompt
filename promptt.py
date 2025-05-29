@@ -18,13 +18,23 @@ selected_image = st.selectbox("เลือกภาพที่ต้องก�
 # ดึง URL จากตัวเลือก
 image_url = image_urls[selected_image]
 
-# แสดง URL และโหลดภาพ
+# แสดง URL
 st.write("แหล่งภาพ:", image_url)
 
-try:
-    response = requests.get(image_url)
-    response.raise_for_status()
-    img = Image.open(BytesIO(response.content))
-    st.image(img, caption=selected_image, use_container_width=True)
-except Exception as e:
-    st.error(f"ไม่สามารถโหลดภาพได้: {e}")
+# ตัวเลือกแปลงเป็นขาวดำ
+convert_gray = st.checkbox("แปลงเป็นภาพขาวดำ")
+
+# ปุ่มกดเพื่อแสดงภาพ
+if st.button("แสดงภาพ"):
+    try:
+        response = requests.get(image_url)
+        response.raise_for_status()
+        img = Image.open(BytesIO(response.content))
+        
+        # แปลงเป็น grayscale ถ้าเลือก
+        if convert_gray:
+            img = img.convert("L")
+        
+        st.image(img, caption=selected_image, use_container_width=True)
+    except Exception as e:
+        st.error(f"ไม่สามารถโหลดภาพได้: {e}")
