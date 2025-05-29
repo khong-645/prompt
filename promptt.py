@@ -8,8 +8,8 @@ st.title("แสดงภาพจาก URL ที่เลือก")
 # รายการ URL ของภาพ
 image_urls = {
     "Bulldog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
-    "แมวดำ": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Cat_poster_1.jpg",
-    "นกยูง": "https://upload.wikimedia.org/wikipedia/commons/b/b1/Peacock_Plumage.jpg"
+    "Tyrannosaurus": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/SUE-T-REX-FMNH-PR-2081-By-JJxFile.jpg/330px-SUE-T-REX-FMNH-PR-2081-By-JJxFile.jpg",
+    "Kiana": "https://upload-os-bbs.hoyolab.com/upload/2023/02/07/5774947/713cbe914f7c32a3e4364e426105591c_8715800185506906620.png?x-oss-process=image%2Fresize%2Cs_1000%2Fauto-orient%2C0%2Finterlace%2C1%2Fformat%2Cwebp%2Fquality%2Cq_70.jpg"
 }
 
 # สร้างตัวเลือก dropdown
