@@ -1,110 +1,139 @@
-def add_axes_and_bg_rotated(image, rotate_angle=0, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
-    import math
-    w, h = image.size
-    margin = 70
 
-    new_w = w + margin * 2
-    new_h = h + margin * 2
+#image_options = {
+#    "Dog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
+#    "Cat": "https://cdn.britannica.com/39/226539-050-D21D7721/Portrait-of-a-cat-with-whiskers-visible.jpg"
+#}
 
-    canvas = Image.new("RGB", (new_w, new_h), bg_color)
-    canvas.paste(image, (margin, margin))
+import streamlit as st
+from skimage import transform
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
+import requests
+from io import BytesIO
 
-    draw = ImageDraw.Draw(canvas)
-    font = get_font(14)
+# -------------------------------
+# ฟังก์ชันโหลดภาพจาก URL
+# -------------------------------
+def load_image_from_url(url):
+    response = requests.get(url)
+    img = Image.open(BytesIO(response.content)).convert("RGB")
+    return np.array(img)
 
-    origin = (margin, margin + h)
-    theta = math.radians(-rotate_angle)  # หมุนแกนไปทางซ้ายตามภาพหมุน
+# -------------------------------
+# ฟังก์ชัน Flip
+# -------------------------------
+def flip_image(image, direction):
+    if direction == "Horizontal":
+        return np.fliplr(image)
+    elif direction == "Vertical":
+        return np.flipud(image)
+    else:
+        return image
 
-    length_x = w
-    length_y = h
+# -------------------------------
+# ฟังก์ชันแสดง histogram
+# -------------------------------
+def plot_histogram(image):
+    fig, ax = plt.subplots()
+    if image.ndim == 3 and image.shape[2] == 3:
+        for i, color in enumerate(['red', 'green', 'blue']):
+            ax.plot(np.histogram(image[:, :, i], bins=256, range=(0, 1))[0], label=color)
+        ax.legend()
+        ax.set_title("Histogram (RGB Channels)")
+    else:
+        ax.hist(image.ravel(), bins=256, color='gray')
+        ax.set_title("Histogram (Grayscale)")
+    return fig
 
-    end_x = (origin[0] + length_x * math.cos(theta),
-             origin[1] + length_x * math.sin(theta))
-    end_y = (origin[0] - length_y * math.sin(theta),
-             origin[1] + length_y * math.cos(theta))
+# -------------------------------
+# URLs ของภาพตัวอย่าง
+# -------------------------------
+image_options = {
+    "Dog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
+    "Cat": "https://cdn.britannica.com/39/226539-050-D21D7721/Portrait-of-a-cat-with-whiskers-visible.jpg"
+}
 
-    # วาดแกน X, Y
-    draw.line([origin, end_x], fill=axis_color, width=2)
-    draw.line([origin, end_y], fill=axis_color, width=2)
+# -------------------------------
+# ส่วน UI
+# -------------------------------
+st.title("Interactive Image Processing with scikit-image")
 
-    num_ticks = 5
-    for i in range(num_ticks + 1):
-        t = i / num_ticks
-        tx = origin[0] + length_x * t * math.cos(theta)
-        ty = origin[1] + length_x * t * math.sin(theta)
-        tick_dx = 5 * math.sin(theta)
-        tick_dy = -5 * math.cos(theta)
-        draw.line([(tx, ty), (tx + tick_dx, ty + tick_dy)], fill=axis_color, width=1)
-        text = str(int(length_x * t))
-        try:
-            bbox = draw.textbbox((0, 0), text, font=font)
-            text_w = bbox[2] - bbox[0]
-            text_h = bbox[3] - bbox[1]
-        except AttributeError:
-            text_w, text_h = draw.textsize(text, font=font)
-        draw.text((tx + 2 * tick_dx - text_w // 2, ty + 2 * tick_dy - text_h // 2), text, fill=axis_color, font=font)
+st.subheader("เลือกภาพตัวอย่าง")
+cols = st.columns(2)
 
-    for i in range(num_ticks + 1):
-        t = i / num_ticks
-        tx = origin[0] - length_y * t * math.sin(theta)
-        ty = origin[1] + length_y * t * math.cos(theta)
-        tick_dx = -5 * math.cos(theta)
-        tick_dy = -5 * math.sin(theta)
-        draw.line([(tx, ty), (tx + tick_dx, ty + tick_dy)], fill=axis_color, width=1)
-        text = str(int(length_y * t))
-        try:
-            bbox = draw.textbbox((0, 0), text, font=font)
-            text_w = bbox[2] - bbox[0]
-            text_h = bbox[3] - bbox[1]
-        except AttributeError:
-            text_w, text_h = draw.textsize(text, font=font)
-        draw.text((tx + 2 * tick_dx - text_w, ty + 2 * tick_dy - text_h // 2), text, fill=axis_color, font=font)
+for i, (label, url) in enumerate(image_options.items()):
+    with cols[i]:
+        st.image(url, caption=label, width=200)
+        if st.button(f"เลือก {label}"):
+            st.session_state.original_image = load_image_from_url(url)
+            st.session_state.reset = True  # trigger reset
 
-    label_offset = 20
-    label_x_pos = (end_x[0] + label_offset * math.cos(theta),
-                   end_x[1] + label_offset * math.sin(theta))
-    label_y_pos = (end_y[0] - label_offset * math.sin(theta),
-                   end_y[1] + label_offset * math.cos(theta))
-    draw.text(label_x_pos, "X", fill=axis_color, font=font)
-    draw.text(label_y_pos, "Y", fill=axis_color, font=font)
+# -------------------------------
+# ถ้ามีภาพที่โหลดแล้ว
+# -------------------------------
+if 'original_image' in st.session_state:
+    if 'reset' not in st.session_state or st.session_state.reset:
+        st.session_state.resize_scale = 1.0
+        st.session_state.angle = 0
+        st.session_state.flip_option = "None"
+        st.session_state.reset = False
 
-    return canvas
+    image = st.session_state.original_image
 
+    # แสดงภาพต้นฉบับ
+    st.subheader("ภาพต้นฉบับ (Original Image with Axes)")
+    fig_orig, ax_orig = plt.subplots()
+    ax_orig.imshow(image)
+    ax_orig.set_title("Original Image")
+    ax_orig.set_xlabel("X (Column)")
+    ax_orig.set_ylabel("Y (Row)")
+    st.pyplot(fig_orig)
 
-# ส่วนเรียกใช้ใน Streamlit
-if st.session_state.selected_name:
-    selected_name = st.session_state.selected_name
-    st.subheader(f"ภาพ: {selected_name}")
+    # ----------------------------
+    # Resize
+    # ----------------------------
+    st.subheader("ปรับขนาด (Resize Image)")
+    resize_scale = st.slider("ปรับขนาด (0.1 = เล็กลง, 2.0 = ใหญ่ขึ้น)", 0.1, 2.0, st.session_state.resize_scale, step=0.1)
+    st.session_state.resize_scale = resize_scale
+    resized_image = transform.rescale(image, resize_scale, channel_axis=2, anti_aliasing=True)
 
-    # ฟิลเตอร์ต่าง ๆ
-    convert_gray = st.checkbox("แปลงเป็นขาวดำ")
-    apply_blur = st.checkbox("เบลอภาพ")
-    contrast_factor = st.slider("ปรับคอนทราสต์", 0.5, 2.0, 1.0, 0.1)
-    rotate_angle = st.slider("หมุนภาพ (องศา)", 0, 360, 0, 5)
+    # ----------------------------
+    # Rotate
+    # ----------------------------
+    st.subheader("หมุนภาพ (Rotate Image)")
+    angle = st.slider("เลือกองศาในการหมุน", -180, 180, st.session_state.angle)
+    st.session_state.angle = angle
+    rotated_image = transform.rotate(resized_image, angle)
 
-    full_url = image_data[selected_name].split("?")[0]
-    try:
-        response = requests.get(full_url)
-        response.raise_for_status()
-        img = Image.open(BytesIO(response.content)).convert("RGB")
+    # ----------------------------
+    # Flip
+    # ----------------------------
+    st.subheader("กลับภาพ (Flip Image)")
+    flip_option = st.selectbox("เลือกการกลับภาพ", ["None", "Horizontal", "Vertical"], index=["None", "Horizontal", "Vertical"].index(st.session_state.flip_option))
+    st.session_state.flip_option = flip_option
+    final_image = flip_image(rotated_image, flip_option)
 
-        if convert_gray:
-            img = img.convert("L").convert("RGB")  # แปลงกลับเป็น RGB เพื่อวาดแกนได้
-        if apply_blur:
-            img = img.filter(ImageFilter.GaussianBlur(2))
-        if contrast_factor != 1.0:
-            enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(contrast_factor)
-        
-        st.write(f"ภาพต้นฉบับขนาด: {img.size}")
-        if rotate_angle != 0:
-            img = img.rotate(-rotate_angle, expand=True)
-            st.write(f"ภาพหมุนขนาด: {img.size}")
+    # -------------------------------
+    # รีเซ็ตค่าหากกดปุ่ม reset
+    # -------------------------------
+    if st.button("รีเซ็ต Transformation"):
+        st.session_state.reset = True
 
-        img_with_axes = add_axes_and_bg_rotated(img, rotate_angle, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
-        st.write(f"ภาพพร้อมแกนขนาด: {img_with_axes.size}")
+    # ----------------------------
+    # แสดงภาพผลลัพธ์
+    # ----------------------------
+    st.subheader("ผลลัพธ์ภาพหลังการแปลง (Transformed Image with Axes)")
+    fig, ax = plt.subplots()
+    ax.imshow(final_image)
+    ax.set_title("Transformed Image")
+    ax.set_xlabel("X (Column)")
+    ax.set_ylabel("Y (Row)")
+    st.pyplot(fig)
 
-        st.image(img_with_axes, caption=f"{selected_name} (หลังปรับ)", use_container_width=True)
-
-    except Exception as e:
-        st.error(f"ไม่สามารถโหลดภาพแบบเต็มได้: {e}")
+    # ----------------------------
+    # แสดง Histogram
+    # ----------------------------
+    st.subheader("Histogram ของภาพหลังการแปลง")
+    hist_fig = plot_histogram(final_image)
+    st.pyplot(hist_fig)
