@@ -54,7 +54,7 @@ def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0
         draw.text((x - 10 - text_w, y - text_h // 2), text, fill=axis_color, font=font)
     return canvas
 
-st.title("เลือกรูปจากรายการพร้อมภาพย่อและฟิลเตอร์ พร้อมเลื่อนดูภาพบางส่วน")
+st.title("เลือกรูปพร้อมฟิลเตอร์และเลื่อนดูภาพบางส่วน (ภาพเต็ม)")
 
 image_data = {
     "Bulldog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
@@ -112,20 +112,31 @@ if st.session_state.selected_name:
             new_h = int(img.height * resize_factor / 100)
             img = img.resize((new_w, new_h), Image.LANCZOS)
 
-        # crop area ขนาด fix (300x300 px)
-        crop_w, crop_h = 300, 300
-        max_x = max(img.width - crop_w, 0)
-        max_y = max(img.height - crop_h, 0)
+        # crop แบบเต็มภาพ (แต่เลื่อนตำแหน่ง crop ให้อยู่ในขอบภาพ)
+        # กำหนดขนาด crop ให้เท่ากับภาพ หรือเล็กกว่าก็ได้
+        crop_w = img.width
+        crop_h = img.height
+        max_x = 0
+        max_y = 0
 
-        # slider เลื่อนตำแหน่ง crop
-        crop_x = st.slider("เลื่อนดูตำแหน่ง X", 0, max_x, 0, 10)
-        crop_y = st.slider("เลื่อนดูตำแหน่ง Y", 0, max_y, 0, 10)
+        # ให้เลื่อน crop เฉพาะถ้า crop size เล็กกว่าภาพ (ที่นี่คือเต็มภาพ เลยไม่ต้องเลื่อน)
+        # แต่ถ้าอยาก crop เล็กกว่าแล้วเลื่อน ก็เปลี่ยน crop_w/crop_h แล้วปลดคอมเมนต์ด้านล่าง
+        # crop_w = min(600, img.width)
+        # crop_h = min(400, img.height)
+        # max_x = img.width - crop_w
+        # max_y = img.height - crop_h
 
-        img_cropped = img.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
+        # crop_x = st.slider("เลื่อนดูตำแหน่ง X", 0, max_x, 0, 10)
+        # crop_y = st.slider("เลื่อนดูตำแหน่ง Y", 0, max_y, 0, 10)
+
+        # img_cropped = img.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
+
+        # ถ้า crop เต็มภาพเลยก็ใช้ img ตรงๆ ได้เลย
+        img_cropped = img
 
         img_with_axes = add_axes_and_bg_rotated(img_cropped, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
 
-        st.image(img_with_axes, caption=f"{selected_name} (ดูบางส่วน)", use_container_width=False)
+        st.image(img_with_axes, caption=f"{selected_name} (ภาพเต็ม)", use_container_width=True)
 
     except Exception as e:
         st.error(f"ไม่สามารถโหลดภาพแบบเต็มได้: {e}")
