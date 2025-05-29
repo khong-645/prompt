@@ -3,20 +3,28 @@ from PIL import Image
 import requests
 from io import BytesIO
 
-# ตั้งชื่อแอป
-st.title("แสดงภาพจาก URL")
+st.title("แสดงภาพจาก URL ที่เลือก")
 
-# URL ของภาพ
-image_url = "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg"
+# รายการ URL ของภาพ
+image_urls = {
+    "Bulldog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
+    "แมวดำ": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Cat_poster_1.jpg",
+    "นกยูง": "https://upload.wikimedia.org/wikipedia/commons/b/b1/Peacock_Plumage.jpg"
+}
 
-# แสดง URL ให้ผู้ใช้เห็น
+# สร้างตัวเลือก dropdown
+selected_image = st.selectbox("เลือกภาพที่ต้องการแสดง:", list(image_urls.keys()))
+
+# ดึง URL จากตัวเลือก
+image_url = image_urls[selected_image]
+
+# แสดง URL และโหลดภาพ
 st.write("แหล่งภาพ:", image_url)
 
-# ดาวน์โหลดและแสดงภาพ
 try:
     response = requests.get(image_url)
-    response.raise_for_status()  # ตรวจสอบว่าโหลดสำเร็จ
+    response.raise_for_status()
     img = Image.open(BytesIO(response.content))
-    st.image(img, caption="ภาพจาก Wikipedia", use_container_width=True)
+    st.image(img, caption=selected_image, use_container_width=True)
 except Exception as e:
     st.error(f"ไม่สามารถโหลดภาพได้: {e}")
