@@ -1,30 +1,10 @@
-import streamlit as st
-from PIL import Image, ImageFilter, ImageEnhance, ImageDraw, ImageFont
-import requests
-from io import BytesIO
-import math
-import os
-
-# โหลดฟอนต์สำหรับวาดตัวเลขแกน (ใช้ฟอนต์ DejaVuSans ที่มากับ PIL ถ้าไม่มีจะใช้ฟอนต์ดีฟอลต์)
-def get_font(size=14):
-    try:
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if not os.path.exists(font_path):
-            # ลองโหลดฟอนต์ PIL ในตัว
-            return ImageFont.load_default()
-        return ImageFont.truetype(font_path, size)
-    except Exception:
-        return ImageFont.load_default()
-
-def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
-    """
-    วาดแกน X, Y และพื้นหลังสีเทาอ่อน โดยแกนจะหมุนตามภาพด้วย
-    """
+def add_axes_and_bg_rotated(image, rotate_angle=0, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
+    import math
     w, h = image.size
-    margin = 50  # ขอบเพิ่มมากขึ้นเพื่อวาดแกน
+    margin = 70
 
-    new_w = w + margin + 10
-    new_h = h + margin + 10
+    new_w = w + margin * 2
+    new_h = h + margin * 2
 
     canvas = Image.new("RGB", (new_w, new_h), bg_color)
     canvas.paste(image, (margin, margin))
@@ -32,65 +12,66 @@ def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0
     draw = ImageDraw.Draw(canvas)
     font = get_font(14)
 
-    # จุดเริ่มต้นแกน (bottom-left corner ของภาพ)
     origin = (margin, margin + h)
+    theta = math.radians(-rotate_angle)  # หมุนแกนไปทางซ้ายตามภาพหมุน
 
-    # วาดแกน X
-    draw.line([origin, (margin + w, margin + h)], fill=axis_color, width=2)
-    # วาดแกน Y
-    draw.line([origin, (margin, margin)], fill=axis_color, width=2)
+    length_x = w
+    length_y = h
 
-    # จำนวน tick marks
+    end_x = (origin[0] + length_x * math.cos(theta),
+             origin[1] + length_x * math.sin(theta))
+    end_y = (origin[0] - length_y * math.sin(theta),
+             origin[1] + length_y * math.cos(theta))
+
+    # วาดแกน X, Y
+    draw.line([origin, end_x], fill=axis_color, width=2)
+    draw.line([origin, end_y], fill=axis_color, width=2)
+
     num_ticks = 5
-
-    # Tick marks แกน X
-    step_x = w / num_ticks
     for i in range(num_ticks + 1):
-        x = margin + int(i * step_x)
-        y = margin + h
-        draw.line([(x, y), (x, y + 5)], fill=axis_color, width=1)
-        text = str(int(i * step_x))
-        text_w, text_h = draw.textsize(text, font=font)
-        draw.text((x - text_w // 2, y + 7), text, fill=axis_color, font=font)
+        t = i / num_ticks
+        tx = origin[0] + length_x * t * math.cos(theta)
+        ty = origin[1] + length_x * t * math.sin(theta)
+        tick_dx = 5 * math.sin(theta)
+        tick_dy = -5 * math.cos(theta)
+        draw.line([(tx, ty), (tx + tick_dx, ty + tick_dy)], fill=axis_color, width=1)
+        text = str(int(length_x * t))
+        try:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+        except AttributeError:
+            text_w, text_h = draw.textsize(text, font=font)
+        draw.text((tx + 2 * tick_dx - text_w // 2, ty + 2 * tick_dy - text_h // 2), text, fill=axis_color, font=font)
 
-    # Tick marks แกน Y
-    step_y = h / num_ticks
     for i in range(num_ticks + 1):
-        x = margin
-        y = margin + h - int(i * step_y)
-        draw.line([(x - 5, y), (x, y)], fill=axis_color, width=1)
-        text = str(int(i * step_y))
-        text_w, text_h = draw.textsize(text, font=font)
-        draw.text((x - 10 - text_w, y - text_h // 2), text, fill=axis_color, font=font)
+        t = i / num_ticks
+        tx = origin[0] - length_y * t * math.sin(theta)
+        ty = origin[1] + length_y * t * math.cos(theta)
+        tick_dx = -5 * math.cos(theta)
+        tick_dy = -5 * math.sin(theta)
+        draw.line([(tx, ty), (tx + tick_dx, ty + tick_dy)], fill=axis_color, width=1)
+        text = str(int(length_y * t))
+        try:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+        except AttributeError:
+            text_w, text_h = draw.textsize(text, font=font)
+        draw.text((tx + 2 * tick_dx - text_w, ty + 2 * tick_dy - text_h // 2), text, fill=axis_color, font=font)
+
+    label_offset = 20
+    label_x_pos = (end_x[0] + label_offset * math.cos(theta),
+                   end_x[1] + label_offset * math.sin(theta))
+    label_y_pos = (end_y[0] - label_offset * math.sin(theta),
+                   end_y[1] + label_offset * math.cos(theta))
+    draw.text(label_x_pos, "X", fill=axis_color, font=font)
+    draw.text(label_y_pos, "Y", fill=axis_color, font=font)
 
     return canvas
 
 
-st.title("เลือกรูปจากรายการพร้อมภาพย่อและฟิลเตอร์")
-
-image_data = {
-    "Bulldog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
-    "brooch": "https://upload-os-bbs.hoyolab.com/upload/2023/02/07/5774947/8105b30243238bce2ef7c8a35934bd6f_9170432348253218955.png?x-oss-process=image%2Fresize%2Cs_300",
-    "Kiana": "https://upload-os-bbs.hoyolab.com/upload/2023/02/07/5774947/713cbe914f7c32a3e4364e426105591c_8715800185506906620.png?x-oss-process=image%2Fresize%2Cs_300"
-}
-
-if "selected_name" not in st.session_state:
-    st.session_state.selected_name = None
-
-cols = st.columns(len(image_data))
-
-for i, (name, url) in enumerate(image_data.items()):
-    with cols[i]:
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            img = Image.open(BytesIO(response.content))
-            st.image(img, caption=name, use_container_width=True)
-            if st.button(f"เลือก {name}", key=name):
-                st.session_state.selected_name = name
-        except Exception as e:
-            st.error(f"โหลดภาพ {name} ไม่ได้")
-
+# ส่วนเรียกใช้ใน Streamlit
 if st.session_state.selected_name:
     selected_name = st.session_state.selected_name
     st.subheader(f"ภาพ: {selected_name}")
@@ -114,11 +95,14 @@ if st.session_state.selected_name:
         if contrast_factor != 1.0:
             enhancer = ImageEnhance.Contrast(img)
             img = enhancer.enhance(contrast_factor)
+        
+        st.write(f"ภาพต้นฉบับขนาด: {img.size}")
         if rotate_angle != 0:
             img = img.rotate(-rotate_angle, expand=True)
+            st.write(f"ภาพหมุนขนาด: {img.size}")
 
-        # วาดแกนและพื้นหลังที่ปรับให้เข้ากับภาพหมุน
-        img_with_axes = add_axes_and_bg_rotated(img, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
+        img_with_axes = add_axes_and_bg_rotated(img, rotate_angle, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
+        st.write(f"ภาพพร้อมแกนขนาด: {img_with_axes.size}")
 
         st.image(img_with_axes, caption=f"{selected_name} (หลังปรับ)", use_container_width=True)
 
