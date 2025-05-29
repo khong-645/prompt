@@ -1,9 +1,9 @@
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageFilter, ImageEnhance
 import requests
 from io import BytesIO
 
-st.title("เลือกรูปจากรายการพร้อมภาพย่อ")
+st.title("เลือกรูปจากรายการพร้อมภาพย่อและฟิลเตอร์")
 
 # รายการภาพ
 image_data = {
@@ -15,7 +15,6 @@ image_data = {
 # แสดงภาพย่อพร้อมปุ่มเลือก
 st.subheader("เลือกรูปที่ต้องการดูแบบเต็ม:")
 cols = st.columns(len(image_data))
-
 selected_name = None
 
 for i, (name, url) in enumerate(image_data.items()):
@@ -33,18 +32,35 @@ for i, (name, url) in enumerate(image_data.items()):
 # ถ้ามีการเลือกภาพ
 if selected_name:
     st.subheader(f"ภาพ: {selected_name}")
-    
-    # ตัวเลือกแปลงเป็นขาวดำ
-    convert_gray = st.checkbox("แปลงเป็นภาพขาวดำ")
+
+    # ตัวเลือกฟิลเตอร์
+    convert_gray = st.checkbox("แปลงเป็นขาวดำ")
+    apply_blur = st.checkbox("เบลอภาพ")
+    contrast_factor = st.slider("ปรับคอนทราสต์", 0.5, 2.0, 1.0, 0.1)
+    rotate_angle = st.slider("หมุนภาพ (องศา)", 0, 360, 0, 5)
 
     # โหลดภาพต้นฉบับ (ไม่ย่อ)
-    full_url = image_data[selected_name].split("?")[0]  # ตัด query string ที่ย่อภาพออก
+    full_url = image_data[selected_name].split("?")[0]
     try:
         response = requests.get(full_url)
         response.raise_for_status()
         img = Image.open(BytesIO(response.content))
+
+        # แปลงภาพตามฟิลเตอร์
         if convert_gray:
             img = img.convert("L")
-        st.image(img, caption=selected_name, use_container_width=True)
+
+        if apply_blur:
+            img = img.filter(ImageFilter.GaussianBlur(2))
+
+        if contrast_factor != 1.0:
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(contrast_factor)
+
+        if rotate_angle != 0:
+            img = img.rotate(-rotate_angle, expand=True)
+
+        st.image(img, caption=f"{selected_name} (หลังปรับ)", use_container_width=True)
+
     except Exception as e:
         st.error(f"ไม่สามารถโหลดภาพแบบเต็มได้: {e}")
