@@ -1,40 +1,70 @@
 import streamlit as st
-from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
+from PIL import Image, ImageFilter, ImageEnhance, ImageDraw, ImageFont
 import requests
 from io import BytesIO
+import math
+import os
 
-def add_axes_and_bg(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
+# โหลดฟอนต์สำหรับวาดตัวเลขแกน (ใช้ฟอนต์ DejaVuSans ที่มากับ PIL ถ้าไม่มีจะใช้ฟอนต์ดีฟอลต์)
+def get_font(size=14):
+    try:
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if not os.path.exists(font_path):
+            # ลองโหลดฟอนต์ PIL ในตัว
+            return ImageFont.load_default()
+        return ImageFont.truetype(font_path, size)
+    except Exception:
+        return ImageFont.load_default()
+
+def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
+    """
+    วาดแกน X, Y และพื้นหลังสีเทาอ่อน โดยแกนจะหมุนตามภาพด้วย
+    """
     w, h = image.size
-    margin = 40  # ขอบสำหรับแกน
+    margin = 50  # ขอบเพิ่มมากขึ้นเพื่อวาดแกน
 
     new_w = w + margin + 10
     new_h = h + margin + 10
 
     canvas = Image.new("RGB", (new_w, new_h), bg_color)
-    canvas.paste(image, (margin, 0))
+    canvas.paste(image, (margin, margin))
 
     draw = ImageDraw.Draw(canvas)
+    font = get_font(14)
 
-    # แกน X
-    draw.line([(margin, h), (new_w - 10, h)], fill=axis_color, width=2)
-    # แกน Y
-    draw.line([(margin, 0), (margin, h + 10)], fill=axis_color, width=2)
+    # จุดเริ่มต้นแกน (bottom-left corner ของภาพ)
+    origin = (margin, margin + h)
 
-    # Tick mark และตัวเลขแกน X
-    step_x = max(1, w // 5)
-    for x in range(0, w + 1, step_x):
-        pos_x = margin + x
-        draw.line([(pos_x, h), (pos_x, h + 5)], fill=axis_color, width=1)
-        draw.text((pos_x - 5, h + 7), str(x), fill=axis_color)
+    # วาดแกน X
+    draw.line([origin, (margin + w, margin + h)], fill=axis_color, width=2)
+    # วาดแกน Y
+    draw.line([origin, (margin, margin)], fill=axis_color, width=2)
 
-    # Tick mark และตัวเลขแกน Y
-    step_y = max(1, h // 5)
-    for y in range(0, h + 1, step_y):
-        pos_y = y
-        draw.line([(margin - 5, pos_y), (margin, pos_y)], fill=axis_color, width=1)
-        draw.text((margin - 30, pos_y - 7), str(h - y), fill=axis_color)
+    # จำนวน tick marks
+    num_ticks = 5
+
+    # Tick marks แกน X
+    step_x = w / num_ticks
+    for i in range(num_ticks + 1):
+        x = margin + int(i * step_x)
+        y = margin + h
+        draw.line([(x, y), (x, y + 5)], fill=axis_color, width=1)
+        text = str(int(i * step_x))
+        text_w, text_h = draw.textsize(text, font=font)
+        draw.text((x - text_w // 2, y + 7), text, fill=axis_color, font=font)
+
+    # Tick marks แกน Y
+    step_y = h / num_ticks
+    for i in range(num_ticks + 1):
+        x = margin
+        y = margin + h - int(i * step_y)
+        draw.line([(x - 5, y), (x, y)], fill=axis_color, width=1)
+        text = str(int(i * step_y))
+        text_w, text_h = draw.textsize(text, font=font)
+        draw.text((x - 10 - text_w, y - text_h // 2), text, fill=axis_color, font=font)
 
     return canvas
+
 
 st.title("เลือกรูปจากรายการพร้อมภาพย่อและฟิลเตอร์")
 
@@ -87,8 +117,8 @@ if st.session_state.selected_name:
         if rotate_angle != 0:
             img = img.rotate(-rotate_angle, expand=True)
 
-        # เพิ่มแกน X, Y และพื้นหลังสีเทาอ่อน
-        img_with_axes = add_axes_and_bg(img, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
+        # วาดแกนและพื้นหลังที่ปรับให้เข้ากับภาพหมุน
+        img_with_axes = add_axes_and_bg_rotated(img, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
 
         st.image(img_with_axes, caption=f"{selected_name} (หลังปรับ)", use_container_width=True)
 
