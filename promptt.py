@@ -17,6 +17,6 @@ try:
     response = requests.get(image_url)
     response.raise_for_status()  # ตรวจสอบว่าโหลดสำเร็จ
     img = Image.open(BytesIO(response.content))
-    st.image(img, caption="ภาพจาก Wikipedia", use_column_width=True)
+    st.image(img, caption="ภาพจาก Wikipedia", use_container_width=True)
 except Exception as e:
     st.error(f"ไม่สามารถโหลดภาพได้: {e}")
