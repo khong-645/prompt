@@ -1,12 +1,11 @@
-import math
-from PIL import ImageDraw
+# ... โค้ดส่วนบนเหมือนเดิม ...
 
-def add_axes_and_bg_rotated(image, rotate_angle_deg, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
+def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
     w, h = image.size
-    margin = 70  # เพิ่มขอบให้กว้างขึ้นเพื่อรองรับแกนหมุน
+    margin = 50
 
-    new_w = w + margin * 2
-    new_h = h + margin * 2
+    new_w = w + margin + 10
+    new_h = h + margin + 10
 
     canvas = Image.new("RGB", (new_w, new_h), bg_color)
     canvas.paste(image, (margin, margin))
@@ -14,86 +13,48 @@ def add_axes_and_bg_rotated(image, rotate_angle_deg, bg_color=(240, 240, 240), a
     draw = ImageDraw.Draw(canvas)
     font = get_font(14)
 
-    # Origin จุดฐานแกน (bottom-left ของภาพบน canvas)
     origin = (margin, margin + h)
 
-    # แปลงองศาเป็นเรเดียน (สำหรับคำนวณ sin cos)
-    theta = math.radians(-rotate_angle_deg)  # หมุนไปทางซ้ายตามการหมุนภาพ
+    draw.line([origin, (margin + w, margin + h)], fill=axis_color, width=2)
+    draw.line([origin, (margin, margin)], fill=axis_color, width=2)
 
-    # ความยาวแกน X และ Y (ใช้ขนาดภาพ)
-    length_x = w
-    length_y = h
-
-    # คำนวณจุดปลายแกน X และ Y หมุนตามมุม
-    end_x = (origin[0] + length_x * math.cos(theta),
-             origin[1] + length_x * math.sin(theta))
-    end_y = (origin[0] - length_y * math.sin(theta),
-             origin[1] + length_y * math.cos(theta))
-
-    # วาดแกน X, Y
-    draw.line([origin, end_x], fill=axis_color, width=2)
-    draw.line([origin, end_y], fill=axis_color, width=2)
-
-    # วาด tick marks บนแกน X
     num_ticks = 5
+    step_x = w / num_ticks
+    step_y = h / num_ticks
+
     for i in range(num_ticks + 1):
-        t = i / num_ticks
-        # ตำแหน่ง tick บนแกน X (linear interpolation)
-        tx = origin[0] + length_x * t * math.cos(theta)
-        ty = origin[1] + length_x * t * math.sin(theta)
-
-        # แนวขวาง tick mark (ตั้งฉากแกน X)
-        tick_dx = 5 * math.sin(theta)
-        tick_dy = -5 * math.cos(theta)
-
-        draw.line([(tx, ty), (tx + tick_dx, ty + tick_dy)], fill=axis_color, width=1)
-
-        text = str(int(length_x * t))
+        x = margin + int(i * step_x)
+        y = margin + h
+        draw.line([(x, y), (x, y + 5)], fill=axis_color, width=1)
+        text = str(int(i * step_x))
         try:
             bbox = draw.textbbox((0, 0), text, font=font)
             text_w = bbox[2] - bbox[0]
             text_h = bbox[3] - bbox[1]
         except AttributeError:
             text_w, text_h = draw.textsize(text, font=font)
+        draw.text((x - text_w // 2, y + 7), text, fill=axis_color, font=font)
 
-        # วางข้อความห่างจาก tick mark เล็กน้อย
-        text_pos = (tx + 2 * tick_dx - text_w // 2, ty + 2 * tick_dy - text_h // 2)
-        draw.text(text_pos, text, fill=axis_color, font=font)
-
-    # วาด tick marks บนแกน Y
     for i in range(num_ticks + 1):
-        t = i / num_ticks
-        # ตำแหน่ง tick บนแกน Y
-        tx = origin[0] - length_y * t * math.sin(theta)
-        ty = origin[1] + length_y * t * math.cos(theta)
-
-        # แนวขวาง tick mark (ตั้งฉากแกน Y)
-        tick_dx = -5 * math.cos(theta)
-        tick_dy = -5 * math.sin(theta)
-
-        draw.line([(tx, ty), (tx + tick_dx, ty + tick_dy)], fill=axis_color, width=1)
-
-        text = str(int(length_y * t))
+        x = margin
+        y = margin + h - int(i * step_y)
+        draw.line([(x - 5, y), (x, y)], fill=axis_color, width=1)
+        text = str(int(i * step_y))
         try:
             bbox = draw.textbbox((0, 0), text, font=font)
             text_w = bbox[2] - bbox[0]
             text_h = bbox[3] - bbox[1]
         except AttributeError:
             text_w, text_h = draw.textsize(text, font=font)
-
-        # วางข้อความห่างจาก tick mark เล็กน้อย
-        text_pos = (tx + 2 * tick_dx - text_w, ty + 2 * tick_dy - text_h // 2)
-        draw.text(text_pos, text, fill=axis_color, font=font)
-
-    # วาด label แกน X, Y
-    label_offset = 20
-    # Label X
-    label_x_pos = (end_x[0] + label_offset * math.cos(theta),
-                   end_x[1] + label_offset * math.sin(theta))
-    draw.text(label_x_pos, "X", fill=axis_color, font=font)
-    # Label Y
-    label_y_pos = (end_y[0] - label_offset * math.sin(theta),
-                   end_y[1] + label_offset * math.cos(theta))
-    draw.text(label_y_pos, "Y", fill=axis_color, font=font)
+        draw.text((x - 10 - text_w, y - text_h // 2), text, fill=axis_color, font=font)
 
     return canvas
+
+# ส่วน image_data
+image_data = {
+    "Bulldog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
+    "brooch": "https://upload-os-bbs.hoyolab.com/upload/2023/02/07/5774947/8105b30243238bce2ef7c8a35934bd6f_9170432348253218955.png?x-oss-process=image%2Fresize%2Cs_300",
+    "Kiana": "https://upload-os-bbs.hoyolab.com/upload/2023/02/07/5774947/713cbe914f7c32a3e4364e426105591c_8715800185506906620.png?x-oss-process=image%2Fresize%2Cs_300"
+}
+
+# ... โค้ดส่วนที่เหลือเหมือนเดิม ...
