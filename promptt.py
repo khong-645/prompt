@@ -4,7 +4,6 @@ import requests
 from io import BytesIO
 import os
 
-# โหลดฟอนต์สำหรับวาดตัวเลขแกน (ใช้ฟอนต์ DejaVuSans ที่มากับ PIL ถ้าไม่มีจะใช้ฟอนต์ดีฟอลต์)
 def get_font(size=14):
     try:
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -15,32 +14,20 @@ def get_font(size=14):
         return ImageFont.load_default()
 
 def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0)):
-    """
-    วาดแกน X, Y และพื้นหลังสีเทาอ่อน โดยแกนจะหมุนตามภาพด้วย
-    """
     w, h = image.size
-    margin = 50  # ขอบเพิ่มมากขึ้นเพื่อวาดแกน
-
+    margin = 50
     new_w = w + margin + 10
     new_h = h + margin + 10
-
     canvas = Image.new("RGB", (new_w, new_h), bg_color)
     canvas.paste(image, (margin, margin))
-
     draw = ImageDraw.Draw(canvas)
     font = get_font(14)
-
     origin = (margin, margin + h)
-
-    # วาดแกน X
     draw.line([origin, (margin + w, margin + h)], fill=axis_color, width=2)
-    # วาดแกน Y
     draw.line([origin, (margin, margin)], fill=axis_color, width=2)
-
     num_ticks = 5
     step_x = w / num_ticks
     step_y = h / num_ticks
-
     for i in range(num_ticks + 1):
         x = margin + int(i * step_x)
         y = margin + h
@@ -53,7 +40,6 @@ def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0
         except AttributeError:
             text_w, text_h = draw.textsize(text, font=font)
         draw.text((x - text_w // 2, y + 7), text, fill=axis_color, font=font)
-
     for i in range(num_ticks + 1):
         x = margin
         y = margin + h - int(i * step_y)
@@ -66,10 +52,9 @@ def add_axes_and_bg_rotated(image, bg_color=(240, 240, 240), axis_color=(0, 0, 0
         except AttributeError:
             text_w, text_h = draw.textsize(text, font=font)
         draw.text((x - 10 - text_w, y - text_h // 2), text, fill=axis_color, font=font)
-
     return canvas
 
-st.title("เลือกรูปจากรายการพร้อมภาพย่อและฟิลเตอร์")
+st.title("เลือกรูปจากรายการพร้อมภาพย่อและฟิลเตอร์ พร้อมเลื่อนดูภาพบางส่วน")
 
 image_data = {
     "Bulldog": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Bulldog_inglese.jpg",
@@ -87,33 +72,20 @@ for i, (name, url) in enumerate(image_data.items()):
             response = requests.get(url)
             response.raise_for_status()
             img = Image.open(BytesIO(response.content))
-            # ปรับขนาดภาพย่อให้พอดีคอลัมน์
             max_width = 150
             ratio = max_width / img.width
             new_size = (max_width, int(img.height * ratio))
             img_thumb = img.resize(new_size, Image.LANCZOS)
-
-            if st.image(img_thumb, caption=name, use_container_width=True, output_format="PNG"):
-                pass
-            if st.button(f"เลือก {name}", key=name):
+            if st.button(f"เลือก {name}", key=f"btn_{name}"):
                 st.session_state.selected_name = name
-
+            st.image(img_thumb, caption=name, use_container_width=True)
         except Exception as e:
             st.error(f"โหลดภาพ {name} ไม่ได้")
-
-# ฟังก์ชันใหม่เพื่อแปลงภาพเป็น clickable image (จำกัดด้วย Streamlit API ปัจจุบัน)
-def image_clickable(name, img):
-    # จริงๆ Streamlit ยังไม่รองรับกดที่รูปโดยตรง
-    # เลยต้องใช้ปุ่มเลือก
-    if st.button(f"เลือก {name}", key=f"btn_{name}"):
-        st.session_state.selected_name = name
-    st.image(img, caption=name, use_container_width=False)
 
 if st.session_state.selected_name:
     selected_name = st.session_state.selected_name
     st.subheader(f"ภาพ: {selected_name}")
 
-    # ฟิลเตอร์ต่าง ๆ
     convert_gray = st.checkbox("แปลงเป็นขาวดำ")
     apply_blur = st.checkbox("เบลอภาพ")
     contrast_factor = st.slider("ปรับคอนทราสต์", 0.5, 2.0, 1.0, 0.1)
@@ -140,8 +112,20 @@ if st.session_state.selected_name:
             new_h = int(img.height * resize_factor / 100)
             img = img.resize((new_w, new_h), Image.LANCZOS)
 
-        img_with_axes = add_axes_and_bg_rotated(img, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
-        st.image(img_with_axes, caption=f"{selected_name} (หลังปรับ)", use_container_width=True)
+        # crop area ขนาด fix (300x300 px)
+        crop_w, crop_h = 300, 300
+        max_x = max(img.width - crop_w, 0)
+        max_y = max(img.height - crop_h, 0)
+
+        # slider เลื่อนตำแหน่ง crop
+        crop_x = st.slider("เลื่อนดูตำแหน่ง X", 0, max_x, 0, 10)
+        crop_y = st.slider("เลื่อนดูตำแหน่ง Y", 0, max_y, 0, 10)
+
+        img_cropped = img.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
+
+        img_with_axes = add_axes_and_bg_rotated(img_cropped, bg_color=(240, 240, 240), axis_color=(0, 0, 0))
+
+        st.image(img_with_axes, caption=f"{selected_name} (ดูบางส่วน)", use_container_width=False)
 
     except Exception as e:
         st.error(f"ไม่สามารถโหลดภาพแบบเต็มได้: {e}")
